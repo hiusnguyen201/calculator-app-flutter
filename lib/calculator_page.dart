@@ -1,3 +1,5 @@
+import 'dart:ffi';
+
 import 'package:flutter/material.dart';
 import 'package:calculator/button_values.dart';
 
@@ -12,10 +14,16 @@ class _CalculatorPageState extends State<CalculatorPage> {
   String number1 = "";
   String operand = "";
   String number2 = "";
+  final int maxDigitsAfterDot = 10;
+  final int maxDigitsNumber = 15;
 
   @override
   Widget build(BuildContext context) {
     final screenSize = MediaQuery.of(context).size;
+    String expression = number1 +
+        (("$number1$operand$number2").length <= maxDigitsNumber ? "" : "\n") +
+        operand +
+        number2;
     return Scaffold(
       body: SafeArea(
         child: Padding(
@@ -29,9 +37,12 @@ class _CalculatorPageState extends State<CalculatorPage> {
                     alignment: Alignment.topRight,
                     padding: const EdgeInsets.all(16),
                     child: Text(
-                      "$number1$operand$number2",
-                      style: const TextStyle(
-                          fontSize: 48, fontWeight: FontWeight.w500),
+                      expression,
+                      style: TextStyle(
+                          fontSize: expression.length <= maxDigitsNumber - 3
+                              ? 48
+                              : 32,
+                          fontWeight: FontWeight.w500),
                       textAlign: TextAlign.end,
                     ),
                   ),
@@ -62,6 +73,7 @@ class _CalculatorPageState extends State<CalculatorPage> {
                 ),
               ),
 
+              // buttons
               Wrap(
                 children: Btn.buttonValues
                     .map((value) => SizedBox(
@@ -70,7 +82,6 @@ class _CalculatorPageState extends State<CalculatorPage> {
                         child: buildButton(value)))
                     .toList(),
               ),
-              // buttons
             ],
           ),
         ),
@@ -131,11 +142,21 @@ class _CalculatorPageState extends State<CalculatorPage> {
     });
   }
 
+  double convertFormatNumToDouble(String num) {
+    if (num.contains(Btn.subtract)) {
+      return -double.parse(num.substring(1));
+    } else if (num.contains(Btn.percent)) {
+      return double.parse(num.substring(0, num.length - 1)) / 100;
+    } else {
+      return double.parse(num);
+    }
+  }
+
   void calculate() {
     if (number1.isEmpty || operand.isEmpty || number2.isEmpty) return;
 
-    final double num1 = double.parse(number1);
-    final double num2 = double.parse(number2);
+    final double num1 = convertFormatNumToDouble(number1);
+    final double num2 = convertFormatNumToDouble(number2);
 
     var result = 0.0;
     switch (operand) {
@@ -153,11 +174,17 @@ class _CalculatorPageState extends State<CalculatorPage> {
         break;
     }
 
+    List<String> afterDotArr = result.toString().split(Btn.dot);
+
     setState(() {
-      number1 = (result.toString().split(".")[1].startsWith("0")
-              ? result.toInt()
-              : result)
-          .toString();
+      if (int.parse(afterDotArr[1]) == int.parse(Btn.num0)) {
+        number1 = afterDotArr[0];
+      } else if (afterDotArr[1].length > maxDigitsAfterDot) {
+        number1 = result.toStringAsFixed(10);
+      } else {
+        number1 = result.toString();
+      }
+
       number2 = "";
       operand = "";
     });
@@ -165,53 +192,47 @@ class _CalculatorPageState extends State<CalculatorPage> {
     result = 0;
   }
 
-  void onBtnTap(String value) {
-    // Clear
-    if (value == Btn.clear) {
-      return clearAll();
+  String getNumValue(String num, String valueTap) {
+    if (valueTap == Btn.dot && !num.contains(Btn.dot)) {
+      return num += num.isEmpty ? Btn.num0 + Btn.dot : Btn.dot;
+    } else if (valueTap == Btn.percent && !num.contains(Btn.percent)) {
+      return num += Btn.percent;
+    } else if (valueTap == Btn.convert && num.isNotEmpty) {
+      return num.contains(Btn.subtract)
+          ? num.replaceAll(Btn.subtract, "")
+          : Btn.subtract + num;
+    } else if (int.tryParse(valueTap) != null) {
+      return num.length < maxDigitsNumber ? num += valueTap : num;
+    } else {
+      return num;
     }
+  }
 
-    // Calculate
-    if (value == Btn.calculate) {
-      return calculate();
+  bool isValidOperand(String valueTap) {
+    return int.tryParse(valueTap) == null &&
+        ![Btn.percent, Btn.calculate, Btn.convert, Btn.dot]
+            .contains(valueTap) &&
+        number1.isNotEmpty;
+  }
+
+  void onBtnTap(String valueTap) {
+    if (valueTap == Btn.clear) return clearAll();
+    if (valueTap == Btn.calculate) return calculate();
+
+    if (isValidOperand(valueTap)) {
+      return setState(() {
+        operand = valueTap;
+      });
     }
 
     if (operand.isEmpty) {
-      if (value == Btn.dot && !number1.contains(Btn.dot)) {
-        return setState(() {
-          number1 += number1.isEmpty ? "0." : ".";
-        });
-      } else if (value == Btn.percent) {
-        return setState(() {
-          number1 += "%";
-        });
-      }
-
-      if (int.tryParse(value) != null) {
-        return setState(() {
-          number1 += value;
-        });
-      } else {
-        return setState(() {
-          operand = value;
-        });
-      }
+      return setState(() {
+        number1 = getNumValue(number1, valueTap);
+      });
     } else {
-      if (value == Btn.dot && !number2.contains(Btn.dot)) {
-        return setState(() {
-          number2 += number2.isEmpty ? "0." : ".";
-        });
-      } else if (value == Btn.percent) {
-        return setState(() {
-          number2 += "%";
-        });
-      }
-
-      if (int.tryParse(value) != null) {
-        return setState(() {
-          number2 += value;
-        });
-      }
+      return setState(() {
+        number2 = getNumValue(number2, valueTap);
+      });
     }
   }
 }

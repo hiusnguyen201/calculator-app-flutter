@@ -8,11 +8,14 @@ class Btn {
   static const String add = "+";
   static const String subtract = "−";
   static const String multiply = "×";
-  static const String divide = "÷";
+  static const String divide = "/";
   static const String calculate = "=";
   static const String dot = ".";
-  static const String roundBrackets = "( )";
-  static const String convert = "+/-";
+  static const String openRoundBracket = "(";
+  static const String closeRoundBracket = ")";
+  static const String roundBrackets =
+      openRoundBracket + " " + closeRoundBracket;
+  static const String convert = add + divide + subtract;
 
   static const String num0 = "0";
   static const String num1 = "1";
